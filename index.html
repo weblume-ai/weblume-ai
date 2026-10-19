@@ -170,6 +170,10 @@ input.sw-t:checked{background:var(--acc)}input.sw-t:checked:before{transform:tra
 .hero-mk img{width:100%;height:auto;mix-blend-mode:normal;animation:wfloat 6s ease-in-out infinite}
 @keyframes wfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
 @media (prefers-reduced-motion:reduce){.hero-mk img,.run .wlm img{animation:none}}
+
+.acct-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}.acct-form .row{grid-column:1/-1}.acct-form input{width:100%}
+#acct-card.in{border-color:#1f4d33}#acct-sub{display:block}
+@media (max-width:640px){.acct-form{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -227,6 +231,12 @@ input.sw-t:checked{background:var(--acc)}input.sw-t:checked:before{transform:tra
   </section>
   <section id="settings" class="page">
     <h2 class="ph">الإعدادات</h2>
+    <div class="card" id="acct-card">
+      <div class="card-h"><div><b>☁ الحساب</b><small id="acct-sub">سجّل دخول عشان مفاتيحك تظهر على أي جهاز</small></div><button type="button" id="acct-out" hidden>خروج</button></div>
+      <div id="acct-form" class="acct-form"><input id="acct-email" type="email" dir="ltr" placeholder="الإيميل" autocomplete="email" aria-label="الإيميل"><input id="acct-pass" type="password" dir="ltr" placeholder="الباسورد (6 حروف على الأقل)" autocomplete="current-password" aria-label="الباسورد">
+        <div class="row"><button class="pri" type="button" id="acct-in">تسجيل دخول</button><button type="button" id="acct-up">حساب جديد</button></div></div>
+      <div id="acct-msg" class="hint" role="status"></div>
+    </div>
     <div class="card">
       <div class="card-h"><div><b>المصادر</b><small>اختار المصدر وحط مفتاحه. كلهم مجانيين.</small></div><button type="button" id="s-testall" style="white-space:nowrap;flex:none">اختبر الكل</button></div>
       <div class="provs">
@@ -253,7 +263,9 @@ input.sw-t:checked{background:var(--acc)}input.sw-t:checked:before{transform:tra
       <div class="row"><button id="s-test">اختبار الاتصال</button><button class="pri" id="s-save">حفظ</button></div>
       <div id="status"></div>
     </div>
-    <details class="card adv"><summary><b>متقدم</b><small>سيرفر مخصص و Ollama</small></summary>
+    <details class="card adv"><summary><b>متقدم</b><small>سيرفر مخصص و Ollama و Supabase</small></summary>
+      <div><label>Supabase Project URL</label><input id="sb-url" dir="ltr" placeholder="https://xxxx.supabase.co"></div>
+      <div><label>Supabase anon / publishable key</label><input id="sb-anon" dir="ltr" autocomplete="off"></div>
       <div><label>عنوان السيرفر</label><input id="s-url" dir="ltr"></div>
       <div><label>مفتاح API</label><input id="s-key" dir="ltr" type="password" autocomplete="off"></div>
       <label class="tg"><span><b>وضع سريع لـ qwen3</b><small>يقلل التفكير الطويل قبل الرد</small></span><input type="checkbox" class="sw-t" id="s-fast"></label>
@@ -1273,8 +1285,55 @@ function detectServer(manual){if(VIA_SERVER||location.protocol==="file:")return;
     const t=document.createElement("div");t.className="srv-go";t.textContent="🟢 متوصل بالسيرفر اللي على جهازك: NVIDIA شغال ومفاتيحك اتحمّلت";document.querySelector("main").prepend(t);setTimeout(()=>t.remove(),5000)})
   .catch(()=>{if(manual){const st=document.getElementById("st-nvidia");if(st){st.className="pv-st bad";st.textContent="❌ start.bat مش شغال";st.title="شغّل start.bat على جهازك. لو شغال واتسألت عن «الشبكة المحلية» اختار Allow."}}})}
 detectServer(false);
+/* ---- Account sync (Supabase). Keys are encrypted in the browser (AES-GCM, key from the password via PBKDF2);
+   the database only ever stores ciphertext. Supabase URL + anon key are public by design. ---- */
+const SUPA_DEFAULT={url:"",anon:""};
+let supa=Object.assign({},SUPA_DEFAULT,store.get("wl_supa_v1",{}));
+let sess=store.get("wl_sess_v1",null),encKey=null,cpT=0;
+const B64={enc:b=>{let s_="";new Uint8Array(b).forEach(x=>s_+=String.fromCharCode(x));return btoa(s_)},dec:t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0))};
+const supaReady=()=>/^https:\/\/[\w.-]+$/.test(String(supa.url||"").replace(/\/+$/,""))&&String(supa.anon||"").length>20;
+async function deriveKey(email,pw){const base=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2",salt:new TextEncoder().encode("weblume-ai:"+email.trim().toLowerCase()),iterations:210000,hash:"SHA-256"},base,{name:"AES-GCM",length:256},true,["encrypt","decrypt"])}
+async function encJSON(o){const iv=crypto.getRandomValues(new Uint8Array(12));const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},encKey,new TextEncoder().encode(JSON.stringify(o)));return "v1:"+B64.enc(iv)+":"+B64.enc(ct)}
+async function decJSON(t){const a=String(t).split(":");if(a[0]!=="v1"||a.length!==3)throw new Error("format");const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:B64.dec(a[1])},encKey,B64.dec(a[2]));return JSON.parse(new TextDecoder().decode(pt))}
+async function supaFetch(path,o){o=o||{};const h=Object.assign({apikey:supa.anon,"Content-Type":"application/json"},o.headers||{});if(o.auth&&sess)h.Authorization="Bearer "+sess.access_token;
+  const r=await fetch(supa.url.replace(/\/+$/,"")+path,{method:o.method||"GET",headers:h,body:o.body?JSON.stringify(o.body):undefined});const t=await r.text();let j=null;try{j=t?JSON.parse(t):null}catch(e){}
+  if(!r.ok){const m=(j&&(j.msg||j.message||j.error_description||j.error))||("HTTP "+r.status);throw Object.assign(new Error(String(m)),{status:r.status})}return j}
+function setSess(j){sess={access_token:j.access_token,refresh_token:j.refresh_token,expires_at:Date.now()+((j.expires_in||3600)-60)*1000,user:{id:j.user.id,email:j.user.email}};store.set("wl_sess_v1",sess)}
+async function ensureFresh(){if(!sess)throw new Error("مش مسجّل دخول");if(Date.now()<sess.expires_at)return;const j=await supaFetch("/auth/v1/token?grant_type=refresh_token",{method:"POST",body:{refresh_token:sess.refresh_token}});setSess(j)}
+function cloudPayload(){return {keys:cfg.keys,pm:cfg.pm,smart:!!cfg.smart,fb:cfg.fb!==false,dl:cfg.dl!==false}}
+async function pushCloud(){if(!sess||!encKey||!supaReady())return;await ensureFresh();const data=await encJSON(cloudPayload());
+  await supaFetch("/rest/v1/user_settings?on_conflict=user_id",{method:"POST",auth:true,headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:{user_id:sess.user.id,data,updated_at:new Date().toISOString()}});acctMsg("✅ متزامن · "+new Date().toLocaleTimeString("ar-EG",{hour:"2-digit",minute:"2-digit"}))}
+function pushCloudSoon(){if(!sess||!encKey)return;clearTimeout(cpT);cpT=setTimeout(()=>pushCloud().catch(e=>acctMsg("⚠️ المزامنة وقفت: "+e.message)),900)}
+function applyCloud(o){if(!o||typeof o!=="object")return;if(o.keys&&typeof o.keys==="object")KEY_PROVS.forEach(p=>{if(typeof o.keys[p]==="string"&&o.keys[p])cfg.keys[p]=o.keys[p]});
+  if(o.pm&&typeof o.pm==="object")Object.keys(o.pm).forEach(k=>{if(PROVIDERS[k]&&typeof o.pm[k]==="string"&&o.pm[k])cfg.pm[k]=o.pm[k]});
+  ["smart","fb","dl"].forEach(k=>{if(typeof o[k]==="boolean")cfg[k]=o[k]});
+  const pv=provOf(cfg);if(pv&&pv!=="local")cfg.key=cfg.keys[pv]||cfg.key;
+  store.set("agent_cfg_v1",cfg);fillCfg();setModel();PROV_ORDER.forEach(p=>{const e_=document.getElementById("st-"+p);if(e_)delete e_.dataset.t});markPreset()}
+async function pullCloud(){await ensureFresh();const rows=await supaFetch("/rest/v1/user_settings?select=data,updated_at",{auth:true});
+  if(Array.isArray(rows)&&rows[0]&&rows[0].data){let o;try{o=await decJSON(rows[0].data)}catch(e){throw new Error("مقدرتش أفك تشفير مفاتيحك. الباسورد اتغيّر؟")}applyCloud(o)}
+  await pushCloud()}
+function acctMsg(t){$("#acct-msg").textContent=t}
+function setAcct(){const inn=!!(sess&&encKey);$("#acct-card").classList.toggle("in",inn);$("#acct-form").hidden=inn;$("#acct-out").hidden=!inn;
+  $("#acct-sub").textContent=inn?"☁ مسجّل باسم "+sess.user.email+": مفاتيحك بتتزامن مشفّرة على كل أجهزتك":supaReady()?"سجّل دخول عشان مفاتيحك تظهر على أي جهاز":"محتاج Supabase URL و anon key من «متقدم» الأول"}
+async function acctLogin(isNew){const email=$("#acct-email").value.trim(),pw=$("#acct-pass").value;
+  if(!supaReady()){acctMsg("⚠️ حط Supabase URL و anon key في «متقدم» الأول.");return}
+  if(!/^\S+@\S+\.\S+$/.test(email)||pw.length<6){acctMsg("⚠️ اكتب إيميل صحيح وباسورد 6 حروف على الأقل.");return}
+  if(!window.crypto||!crypto.subtle){acctMsg("⚠️ المتصفح ده مش بيدعم التشفير هنا. افتح من لينك GitHub أو 127.0.0.1:8787.");return}
+  acctMsg("… لحظة");
+  try{if(isNew){const j=await supaFetch("/auth/v1/signup",{method:"POST",body:{email,password:pw}});
+      if(!j||!j.access_token){acctMsg("📧 اتبعتلك إيميل تأكيد. افتحه ودوس على اللينك، وبعدين ارجع دوس «تسجيل دخول».");return}setSess(j)}
+    else setSess(await supaFetch("/auth/v1/token?grant_type=password",{method:"POST",body:{email,password:pw}}));
+    encKey=await deriveKey(email,pw);store.set("wl_ek_v1",await crypto.subtle.exportKey("jwk",encKey));$("#acct-pass").value="";setAcct();await pullCloud()}
+  catch(e){const m=String(e.message||"");acctMsg("❌ "+(/invalid login|invalid_grant|credentials/i.test(m)?"الإيميل أو الباسورد غلط.":/not confirmed/i.test(m)?"لسه ماأكدتش الإيميل. افتح الإيميل ودوس على لينك التأكيد.":/already registered|already exists/i.test(m)?"الإيميل ده عنده حساب. دوس «تسجيل دخول».":/relation|user_settings/i.test(m)?"جدول user_settings مش موجود في Supabase. شغّل كود SQL.":m))}}
+$("#acct-in").onclick=()=>acctLogin(false);$("#acct-up").onclick=()=>acctLogin(true);
+$("#acct-pass").addEventListener("keydown",ev=>{if(ev.key==="Enter")acctLogin(false)});
+$("#acct-out").onclick=()=>{if(!confirm("تسجّل خروج؟ المفاتيح هتفضل على الجهاز ده لحد ما تمسحها."))return;sess=null;encKey=null;store.set("wl_sess_v1",null);store.set("wl_ek_v1",null);setAcct();acctMsg("اتسجّل الخروج.")};
+$("#sb-url").value=supa.url||"";$("#sb-anon").value=supa.anon||"";
+["#sb-url","#sb-anon"].forEach(id=>$(id).addEventListener("input",()=>{supa={url:$("#sb-url").value.trim(),anon:$("#sb-anon").value.trim()};store.set("wl_supa_v1",supa);setAcct()}));
+(async()=>{setAcct();const jwk=store.get("wl_ek_v1",null);if(sess&&jwk&&supaReady()&&window.crypto&&crypto.subtle){try{encKey=await crypto.subtle.importKey("jwk",jwk,{name:"AES-GCM"},true,["encrypt","decrypt"]);setAcct();await pullCloud()}catch(e){if(e.status===400||e.status===401){sess=null;encKey=null;store.set("wl_sess_v1",null);setAcct();acctMsg("⚠️ الجلسة خلصت، سجّل دخول تاني.")}else acctMsg("⚠️ المزامنة وقفت: "+e.message)}}})();
 $("#s-save").onclick=()=>{persist();$("#status").textContent="✅ اتحفظ."};
-let ssT=0;function saveServer(){if(!SRV)return;clearTimeout(ssT);ssT=setTimeout(()=>{fetch(SRV_BASE+"/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({keys:cfg.keys,pm:cfg.pm,smart:!!cfg.smart,fb:cfg.fb!==false,dl:cfg.dl!==false,url:cfg.url,model:cfg.model})}).catch(()=>{})},400)}
+let ssT=0;function saveServer(){pushCloudSoon();if(!SRV)return;clearTimeout(ssT);ssT=setTimeout(()=>{fetch(SRV_BASE+"/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({keys:cfg.keys,pm:cfg.pm,smart:!!cfg.smart,fb:cfg.fb!==false,dl:cfg.dl!==false,url:cfg.url,model:cfg.model})}).catch(()=>{})},400)}
 function persist(){readCfg();store.set("agent_cfg_v1",cfg);setModel();markPreset();saveServer()}
 ["#s-url","#s-model","#s-key"].forEach(i=>$(i).addEventListener("input",persist));
 ["#s-fast","#s-dl","#s-fb","#s-smart"].forEach(i=>$(i).addEventListener("change",persist));
