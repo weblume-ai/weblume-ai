@@ -53,6 +53,11 @@ function cleanSettings(b){const o={};const str=(v,n)=>typeof v==="string"?v.trim
   for(const k of["smart","fb","dl"])if(typeof b[k]==="boolean")o[k]=b[k];
   for(const k of["url","model"]){const v=str(b[k],300);if(v!==undefined)o[k]=v}
   return o}
+// Your own hosted copy (GitHub Pages) may talk to this local server. Nothing else may.
+const ALLOWED_ORIGINS=new Set(["https://weblume-ai.github.io",...String(process.env.WEBLUME_ALLOWED_ORIGINS||"").split(",").map(x=>x.trim()).filter(x=>/^https:\/\/[\w.-]+$/.test(x))]);
+function corsFor(req,res){const o=req.headers.origin;if(!o||!ALLOWED_ORIGINS.has(o))return false;
+  res.setHeader("Access-Control-Allow-Origin",o);res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Headers","Authorization, Content-Type");
+  res.setHeader("Access-Control-Allow-Methods","GET, POST, OPTIONS");res.setHeader("Access-Control-Allow-Private-Network","true");res.setHeader("Access-Control-Max-Age","600");return true}
 const prompt=b=>typeof b.prompt==="string"&&b.prompt.trim()&&b.prompt.length<=4000?b.prompt.trim():null;
 function state(){const v=video.config();return{
   image:images.configured(),video:v.configured,videoCancel:v.configured,
@@ -70,7 +75,9 @@ async function streamFile(req,res,id){
 const server=http.createServer(async(req,res)=>{
   try{
     const p=new URL(req.url,"http://x").pathname,m=req.method;
-    if(m!=="GET"&&m!=="HEAD"){const o=req.headers.origin;if(o&&o!=="http://"+req.headers.host&&o!=="https://"+req.headers.host)return send(res,403,{error:"Origin غير مسموح."})}
+    const allowed=p.startsWith("/api/")&&corsFor(req,res);
+    if(m==="OPTIONS"){if(!allowed)return send(res,403,{error:"Origin غير مسموح."});res.writeHead(204,baseHeaders);return res.end()}
+    if(m!=="GET"&&m!=="HEAD"&&!allowed){const o=req.headers.origin;if(o&&o!=="http://"+req.headers.host&&o!=="https://"+req.headers.host)return send(res,403,{error:"Origin غير مسموح."})}
     if(m==="GET"&&(p==="/"||p==="/index.html")){res.writeHead(200,{...baseHeaders,"Content-Type":"text/html; charset=utf-8"});return res.end(fs.readFileSync(path.join(ROOT,"index.html")))}
     if(m==="GET"&&p==="/api/health")return send(res,200,state());
     if(p==="/api/settings"){

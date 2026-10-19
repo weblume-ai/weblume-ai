@@ -34,6 +34,9 @@ The model pill in the chat header opens a switcher between free OpenAI-compatibl
 These providers do not accept direct browser calls (CORS). Run the app through the bundled server and the browser talks to `/api/llm/<provider>/…`, which relays to the fixed upstream (`integrate.api.nvidia.com/v1`, `api.cerebras.ai/v1`) with the user's own key from the Authorization header (or `NVIDIA_API_KEY` / `CEREBRAS_API_KEY` in `.env`). Streaming is passed through, bodies up to 4 MB, foreign Origins rejected, unknown provider names rejected.
 On Windows double-click `start.bat` (needs Node.js LTS); it opens `http://127.0.0.1:8787`. Because the server URL is a different browser origin from the file, use Settings → Advanced → copy/paste settings to move your keys once.
 
+## Hosted copy (GitHub Pages) + local server
+When `start.bat` is running, the hosted copy at `https://weblume-ai.github.io/weblume-ai/` detects `http://127.0.0.1:8787` and uses it for NVIDIA and for the saved keys file. The server sends CORS (+ `Access-Control-Allow-Private-Network`) only to that origin (extra origins via `WEBLUME_ALLOWED_ORIGINS`, https only); every other site is refused. Chrome/Edge ask once to allow "local network access": choose Allow.
+
 ## Thinking panel
 While the agent works, a collapsible panel with the animated Weblume mark shows the phase and timer. Reasoning text, tool calls and provider switches stay inside it, collapsed by default.
 

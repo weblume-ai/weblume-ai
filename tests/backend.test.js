@@ -119,6 +119,17 @@ const call=(port,method,p,body,o={})=>new Promise(res=>{const d=o.raw!==undefine
   r=await call(p,"GET","/api/settings",null,{h:{Host:"localhost:"+p}});T("settings: saved, cleaned, readable",r.s===200&&r.j.keys.groq==="gsk_x1234567"&&!("evil$" in r.j.keys)&&r.j.smart===true&&!("junk" in r.j));
   r=await call(p,"GET","/api/settings",null,{h:{Host:"attacker.example:"+p}});T("settings: foreign Host rejected (DNS rebinding)",r.s===403);
   r=await call(p,"POST","/api/settings",{keys:{groq:"x"}},{h:{Host:"127.0.0.1:"+p,Origin:"https://evil.example"}});T("settings: foreign Origin cannot write",r.s===403);
+  // hosted copy (GitHub Pages) may use the local server; other sites may not
+  r=await call(p,"OPTIONS","/api/llm/nvidia/chat/completions",null,{h:{Host:"127.0.0.1:"+p,Origin:"https://weblume-ai.github.io","Access-Control-Request-Private-Network":"true"}});
+  T("cors: own GitHub Pages preflight allowed (+Private Network)",r.s===204&&r.h["access-control-allow-origin"]==="https://weblume-ai.github.io"&&r.h["access-control-allow-private-network"]==="true");
+  r=await call(p,"OPTIONS","/api/settings",null,{h:{Host:"127.0.0.1:"+p,Origin:"https://evil.example"}});
+  T("cors: other site preflight rejected",r.s===403&&!r.h["access-control-allow-origin"]);
+  r=await call(p,"GET","/api/settings",null,{h:{Host:"127.0.0.1:"+p,Origin:"https://evil.example"}});
+  T("cors: other site gets no CORS header (browser blocks read)",!r.h["access-control-allow-origin"]);
+  r=await call(p,"POST","/api/settings",{keys:{groq:"gsk_fromPages1"}},{h:{Host:"127.0.0.1:"+p,Origin:"https://weblume-ai.github.io"}});
+  T("cors: own GitHub Pages can save settings",r.s===200&&r.h["access-control-allow-origin"]==="https://weblume-ai.github.io");
+  r=await call(p,"POST","/api/llm/nvidia/chat/completions",{model:"m",stream:true},{h:{Host:"127.0.0.1:"+p,Origin:"https://weblume-ai.github.io",Authorization:"Bearer nvapi-MOCKKEY123"}});
+  T("cors: own GitHub Pages can use NVIDIA relay",r.s===200&&/"hi"/.test(r.t));
   try{fs.unlinkSync(SF)}catch(e){}
   console.log("RESULT pass="+pass+" fail="+fail);server.close();mock.close();process.exit(fail?1:0);
 })();

@@ -234,7 +234,7 @@ input.sw-t:checked{background:var(--acc)}input.sw-t:checked:before{transform:tra
       <div class="prov" id="pv-groq"><button type="button" class="pv-pick" id="p-groq"><span class="pv-ic">⚡</span><span class="pv-tx"><b>Groq</b><small>أسرع رد</small></span></button><div class="pv-key"><input id="k-groq" dir="ltr" type="password" autocomplete="off" placeholder="gsk_…" aria-label="مفتاح Groq"><a href="https://console.groq.com/keys" target="_blank" rel="noopener">طلّع مفتاح</a></div><span class="pv-st" id="st-groq"></span></div>
       <div class="prov" id="pv-gemini"><button type="button" class="pv-pick" id="p-gemini"><span class="pv-ic">✦</span><span class="pv-tx"><b>Gemini</b><small>المواقع والكتابة</small></span></button><div class="pv-key"><input id="k-gemini" dir="ltr" type="password" autocomplete="off" placeholder="AIza…" aria-label="مفتاح Gemini"><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">طلّع مفتاح</a></div><span class="pv-st" id="st-gemini"></span></div>
       <div class="prov" id="pv-mistral"><button type="button" class="pv-pick" id="p-mistral"><span class="pv-ic">🌀</span><span class="pv-tx"><b>Mistral</b><small>الكود (Codestral)</small></span></button><div class="pv-key"><input id="k-mistral" dir="ltr" type="password" autocomplete="off" placeholder="" aria-label="مفتاح Mistral"><a href="https://console.mistral.ai/api-keys" target="_blank" rel="noopener">طلّع مفتاح</a></div><span class="pv-st" id="st-mistral"></span></div>
-      <div class="prov" id="pv-nvidia"><button type="button" class="pv-pick" id="p-nvidia"><span class="pv-ic">🟩</span><span class="pv-tx"><b>NVIDIA</b><small>محتاج السيرفر (start.bat)</small></span></button><div class="pv-key"><input id="k-nvidia" dir="ltr" type="password" autocomplete="off" placeholder="nvapi-…" aria-label="مفتاح NVIDIA"><a href="https://build.nvidia.com" target="_blank" rel="noopener">طلّع مفتاح</a></div><span class="pv-st" id="st-nvidia"></span></div>
+      <div class="prov" id="pv-nvidia"><button type="button" class="pv-pick" id="p-nvidia"><span class="pv-ic">🟩</span><span class="pv-tx"><b>NVIDIA</b><small>محتاج start.bat شغال</small></span></button><div class="pv-key"><input id="k-nvidia" dir="ltr" type="password" autocomplete="off" placeholder="nvapi-…" aria-label="مفتاح NVIDIA"><a href="https://build.nvidia.com" target="_blank" rel="noopener">طلّع مفتاح</a></div><span class="pv-st" id="st-nvidia"></span></div>
       <div class="prov" id="pv-cerebras"><button type="button" class="pv-pick" id="p-cerebras"><span class="pv-ic">🚀</span><span class="pv-tx"><b>Cerebras</b><small>محتاج فيزا</small></span></button><div class="pv-key"><input id="k-cerebras" dir="ltr" type="password" autocomplete="off" placeholder="csk-…" aria-label="مفتاح Cerebras"><a href="https://cloud.cerebras.ai" target="_blank" rel="noopener">طلّع مفتاح</a></div><span class="pv-st" id="st-cerebras"></span></div>
       <div class="prov" id="pv-local"><button type="button" class="pv-pick" id="p-local"><span class="pv-ic">💻</span><span class="pv-tx"><b>جهازي</b><small>Ollama · من غير إنترنت</small></span></button><div class="pv-key"><span class="hint">مش محتاج مفتاح</span></div><span class="pv-st" id="st-local"></span></div>
       </div>
@@ -1158,8 +1158,10 @@ const PROV_ORDER=["openrouter","groq","gemini","mistral","cerebras","nvidia","lo
 const KEY_PROVS=PROV_ORDER.filter(p=>p!=="local");
 const NEEDS_SERVER=new Set(["nvidia","cerebras"]),DIRECT_URL={nvidia:PROVIDERS.nvidia.url,cerebras:PROVIDERS.cerebras.url};
 const VIA_SERVER=/^https?:$/.test(location.protocol)&&/^(127\.0\.0\.1|localhost)$/.test(location.hostname);
-if(VIA_SERVER)NEEDS_SERVER.forEach(p=>{PROVIDERS[p].url=location.origin+"/api/llm/"+p});
-const usable=p=>!!cfg.keys[p]&&(VIA_SERVER||!NEEDS_SERVER.has(p));
+let SRV=VIA_SERVER;const SRV_BASE=VIA_SERVER?location.origin:"http://127.0.0.1:8787";
+function useServer(){SRV=true;NEEDS_SERVER.forEach(p=>{PROVIDERS[p].url=SRV_BASE+"/api/llm/"+p})}
+if(VIA_SERVER)useServer();
+const usable=p=>!!cfg.keys[p]&&(SRV||!NEEDS_SERVER.has(p));
 const ROUTES={
   site:{label:"موقع",list:[["gemini","gemini-2.5-flash"],["openrouter","minimax/minimax-m3.1-flash:free"],["groq","openai/gpt-oss-120b"],["openrouter","nvidia/nemotron-3.5-super-vl:free"],["cerebras","gpt-oss-120b"],["nvidia","nvidia/nemotron-3.5-super-vl-120b-a12b"],["mistral","mistral-small-latest"]]},
   code:{label:"كود",list:[["mistral","codestral-latest"],["openrouter","minimax/minimax-m3.1-flash:free"],["gemini","gemini-2.5-flash"],["groq","openai/gpt-oss-120b"],["cerebras","gpt-oss-120b"],["nvidia","nvidia/nemotron-3.5-super-vl-120b-a12b"],["openrouter","nvidia/nemotron-3.5-super-vl:free"]]},
@@ -1224,7 +1226,7 @@ $("#sk-impf").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(
 /* settings */
 function fillCfg(){$("#s-url").value=cfg.url;$("#s-model").value=cfg.model;$("#s-key").value=cfg.key;$("#s-fast").checked=!!cfg.fast;$("#s-dl").checked=!!cfg.dl;$("#s-fb").checked=cfg.fb!==false;KEY_PROVS.forEach(p=>{const el=document.getElementById("k-"+p);if(el)el.value=cfg.keys[p]||""});$("#s-smart").checked=!!cfg.smart;markPreset()}
 function markPreset(){const c=provOf(cfg);PROV_ORDER.forEach(p=>{const b=document.getElementById("pv-"+p);if(b)b.classList.toggle("on",c===p);const st=document.getElementById("st-"+p);if(st&&!st.dataset.t){const has=p==="local"||!!cfg.keys[p];st.className="pv-st "+(c===p?"ok":has?"":"need");st.textContent=c===p?"شغال دلوقتي":p==="local"?"":has?"جاهز":"محتاج مفتاح"}})}
-async function testOne(p){const st=document.getElementById("st-"+p);const P=PROVIDERS[p],k=p==="local"?"":cfg.keys[p];if(p!=="local"&&!k)return;st.dataset.t="1";if(NEEDS_SERVER.has(p)&&!VIA_SERVER){st.className="pv-st bad";st.textContent="❌ افتحه من السيرفر ←";st.title="شغّل start.bat الأول، وبعدين دوس هنا";st.style.cursor="pointer";st.onclick=openOnServer;return}st.className="pv-st";st.textContent="… بيختبر";
+async function testOne(p){const st=document.getElementById("st-"+p);const P=PROVIDERS[p],k=p==="local"?"":cfg.keys[p];if(p!=="local"&&!k)return;st.dataset.t="1";if(NEEDS_SERVER.has(p)&&!SRV){st.className="pv-st bad";st.textContent="❌ شغّل start.bat ←";st.title="شغّل start.bat على جهازك، وبعدين دوس هنا";st.style.cursor="pointer";st.onclick=()=>{if(location.protocol==="file:")openOnServer();else detectServer(true)};return}st.className="pv-st";st.textContent="… بيختبر";
   const done=(ok,t)=>{st.className="pv-st "+(ok?"ok":"bad");st.textContent=t;st.title=t};
   try{const h={};if(k)h.Authorization="Bearer "+k;const r=await fetch(P.url+"/models",{headers:h});
     if(!r.ok){done(false,r.status===401||r.status===403?"❌ المفتاح غلط":"❌ خطأ "+r.status);return}
@@ -1245,7 +1247,7 @@ $("#s-import").onclick=()=>{const t=(prompt("الصق النص اللي نسخت
 const SERVER_URL="http://127.0.0.1:8787/";
 function openOnServer(){location.href=SERVER_URL+"#wlcfg="+encodeURIComponent(exportCfg())}
 if(VIA_SERVER&&location.hash.startsWith("#wlcfg=")){const t=decodeURIComponent(location.hash.slice(7));window.history.replaceState(null,"",location.pathname);if(importCfg(t)){setTimeout(()=>{tab("settings");$("#s-testall").click()},300)}}
-if(!VIA_SERVER){fetch(SERVER_URL+"api/health",{mode:"no-cors",cache:"no-store"}).then(()=>{const b=document.createElement("button");b.type="button";b.id="srv-go";b.className="srv-go";b.textContent="🟢 السيرفر شغال · افتح Weblume منه (مفاتيحك هتتنقل لوحدها)";b.onclick=openOnServer;document.querySelector("main").prepend(b)}).catch(()=>{})}
+if(!VIA_SERVER&&location.protocol==="file:"){fetch(SERVER_URL+"api/health",{mode:"no-cors",cache:"no-store"}).then(()=>{const b=document.createElement("button");b.type="button";b.id="srv-go";b.className="srv-go";b.textContent="🟢 السيرفر شغال · افتح Weblume منه (مفاتيحك هتتنقل لوحدها)";b.onclick=openOnServer;document.querySelector("main").prepend(b)}).catch(()=>{})}
 $("#s-testall").onclick=async()=>{const b=$("#s-testall");b.disabled=true;b.textContent="بيختبر…";await Promise.all(PROV_ORDER.map(testOne));b.disabled=false;b.textContent="اختبر الكل"};
 function readCfg(){const keys=Object.assign({},cfg.keys);KEY_PROVS.forEach(p=>{const el=document.getElementById("k-"+p);if(el)keys[p]=el.value.trim()});const url=$("#s-url").value.trim(),model=$("#s-model").value.trim();let key=$("#s-key").value.trim();const pv=provOf({url});if(pv&&pv!=="local"&&!key&&keys[pv])key=keys[pv];const pm=Object.assign({},cfg.pm);if(pv&&model)pm[pv]=model;cfg={url,model,key,fast:$("#s-fast").checked,dl:$("#s-dl").checked,fb:$("#s-fb").checked,smart:$("#s-smart").checked,keys,pm,mm31:1}}
 function applyProvider(p,model){readCfg();const P=PROVIDERS[p];cfg=Object.assign({},cfg,{url:P.url,model:model||cfg.pm[p]||P.model,key:p==="local"?"":(cfg.keys[p]||""),fast:p==="local"});fillCfg();store.set("agent_cfg_v1",cfg);saveServer();setModel();const st=$("#status");st.style.whiteSpace="pre-wrap";
@@ -1254,17 +1256,25 @@ PROV_ORDER.forEach(p=>{const b=document.getElementById("p-"+p);if(b)b.onclick=()
 KEY_PROVS.forEach(p=>{const el=document.getElementById("k-"+p);if(el)el.addEventListener("input",()=>{if(provOf({url:$("#s-url").value})===p)$("#s-key").value=el.value.trim();delete MODEL_CACHE[p];const st=document.getElementById("st-"+p);if(st)delete st.dataset.t;persist()})});
 const MODEL_CACHE={};
 fillCfg();
-if(VIA_SERVER){$("#keys-hint").textContent="🔒 المفاتيح محفوظة في ملف على جهازك (weblume-settings.json)، ومش هتضيع لو المتصفح اتمسح.";
-  fetch("/api/settings",{cache:"no-store"}).then(r=>r.ok?r.json():{}).then(o=>{if(!o||typeof o!=="object")return;let ch=false;const hadAny=KEY_PROVS.some(p=>cfg.keys[p]);
+function loadServerSettings(){$("#keys-hint").textContent="🔒 المفاتيح محفوظة في ملف على جهازك (weblume-settings.json)، ومش هتضيع لو المتصفح اتمسح.";
+  return fetch(SRV_BASE+"/api/settings",{cache:"no-store"}).then(r=>r.ok?r.json():{}).then(o=>{if(!o||typeof o!=="object")return;let ch=false;const hadAny=KEY_PROVS.some(p=>cfg.keys[p]);
     if(o.keys&&typeof o.keys==="object")KEY_PROVS.forEach(p=>{if(typeof o.keys[p]==="string"&&o.keys[p]&&!cfg.keys[p]){cfg.keys[p]=o.keys[p];ch=true}});
     if(o.pm&&typeof o.pm==="object")Object.keys(o.pm).forEach(k=>{if(PROVIDERS[k]&&!cfg.pm[k]&&typeof o.pm[k]==="string"){cfg.pm[k]=o.pm[k];ch=true}});
     if(!hadAny&&ch){if(typeof o.smart==="boolean")cfg.smart=o.smart;if(typeof o.fb==="boolean")cfg.fb=o.fb;if(typeof o.dl==="boolean")cfg.dl=o.dl;
       if(typeof o.url==="string"&&typeof o.model==="string"){const pv=provOf({url:o.url});if(pv){cfg.url=PROVIDERS[pv].url;cfg.model=o.model}}}
     const pv=provOf(cfg);if(pv&&pv!=="local"&&!cfg.key&&cfg.keys[pv])cfg.key=cfg.keys[pv];
+    if(NEEDS_SERVER.has(provOf(cfg)))cfg.url=PROVIDERS[provOf(cfg)].url;
     if(ch){store.set("agent_cfg_v1",cfg);fillCfg();setModel()}
     saveServer()}).catch(()=>{})}
+if(VIA_SERVER)loadServerSettings();
+// GitHub Pages (or any https copy): connect to the local server started by start.bat, if it's running
+function detectServer(manual){if(VIA_SERVER||location.protocol==="file:")return;
+  fetch(SRV_BASE+"/api/health",{cache:"no-store"}).then(r=>{if(!r.ok)throw 0;useServer();loadServerSettings().then(()=>{PROV_ORDER.forEach(p=>{const e_=document.getElementById("st-"+p);if(e_)delete e_.dataset.t});markPreset();setModel();if(manual)testOne("nvidia")});
+    const t=document.createElement("div");t.className="srv-go";t.textContent="🟢 متوصل بالسيرفر اللي على جهازك: NVIDIA شغال ومفاتيحك اتحمّلت";document.querySelector("main").prepend(t);setTimeout(()=>t.remove(),5000)})
+  .catch(()=>{if(manual){const st=document.getElementById("st-nvidia");if(st){st.className="pv-st bad";st.textContent="❌ start.bat مش شغال";st.title="شغّل start.bat على جهازك. لو شغال واتسألت عن «الشبكة المحلية» اختار Allow."}}})}
+detectServer(false);
 $("#s-save").onclick=()=>{persist();$("#status").textContent="✅ اتحفظ."};
-let ssT=0;function saveServer(){if(!VIA_SERVER)return;clearTimeout(ssT);ssT=setTimeout(()=>{fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({keys:cfg.keys,pm:cfg.pm,smart:!!cfg.smart,fb:cfg.fb!==false,dl:cfg.dl!==false,url:cfg.url,model:cfg.model})}).catch(()=>{})},400)}
+let ssT=0;function saveServer(){if(!SRV)return;clearTimeout(ssT);ssT=setTimeout(()=>{fetch(SRV_BASE+"/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({keys:cfg.keys,pm:cfg.pm,smart:!!cfg.smart,fb:cfg.fb!==false,dl:cfg.dl!==false,url:cfg.url,model:cfg.model})}).catch(()=>{})},400)}
 function persist(){readCfg();store.set("agent_cfg_v1",cfg);setModel();markPreset();saveServer()}
 ["#s-url","#s-model","#s-key"].forEach(i=>$(i).addEventListener("input",persist));
 ["#s-fast","#s-dl","#s-fb","#s-smart"].forEach(i=>$(i).addEventListener("change",persist));
@@ -1594,7 +1604,7 @@ function buildSw(){const m=$("#sw-menu");m.textContent="";const cur=provOf(cfg);
   sm_.innerHTML='<span class="sw-ic">🧠</span><span class="sw-tx"><b>توزيع ذكي</b><small>كل طلب للموديل الشاطر فيه ('+n_+' مصادر ليها مفتاح)</small></span><span class="sw-st '+(cfg.smart?"ok":"")+'">'+(cfg.smart?"شغال":"مقفول")+'</span>';
   sm_.onclick=()=>{$("#s-smart").checked=!cfg.smart;persist();buildSw()};m.appendChild(sm_);
   const hd=document.createElement("div");hd.className="sw-h";hd.textContent=cfg.smart?"المصدر الاحتياطي لو التوزيع مش لاقي حاجة":"بدّل المصدر (كلهم مجانيين)";m.appendChild(hd);
-  PROV_ORDER.forEach(p=>{const P=PROVIDERS[p],has=p==="local"||!!cfg.keys[p],on=cur===p,srv=NEEDS_SERVER.has(p)&&!VIA_SERVER;
+  PROV_ORDER.forEach(p=>{const P=PROVIDERS[p],has=p==="local"||!!cfg.keys[p],on=cur===p,srv=NEEDS_SERVER.has(p)&&!SRV;
     const b=document.createElement("button");b.type="button";b.className="sw-item"+(on?" on":"");
     const ic=document.createElement("span");ic.className="sw-ic";ic.textContent=P.ic;
     const tx=document.createElement("span");tx.className="sw-tx";const bb=document.createElement("b");bb.textContent=P.label;const sm=document.createElement("small");sm.textContent=on?String(cfg.model):P.note;tx.append(bb,sm);
