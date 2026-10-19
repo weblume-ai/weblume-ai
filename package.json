@@ -1,0 +1,13 @@
+{
+  "name": "weblume-ai",
+  "version": "1.0.0",
+  "description": "Weblume AI workspace: single-file frontend plus an optional zero-dependency image/video proxy.",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server/proxy.js",
+    "check": "node --check server/proxy.js && node --check server/providers/http.js && node --check server/providers/openai-images.js && node --check server/providers/replicate-video.js",
+    "test": "node tests/backend.test.js && node tests/frontend.test.js"
+  }
+}
