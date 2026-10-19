@@ -42,6 +42,17 @@ async function relayLLM(req,res,name,sub){
   res.writeHead(r.status,o);if(!r.body){clearTimeout(t);return res.end()}
   Readable.fromWeb(r.body).on("error",()=>res.destroy()).on("end",()=>clearTimeout(t)).pipe(res);
 }
+// Local settings file: keeps the user's own API keys on this computer so they survive browser data clearing.
+// Only reachable through 127.0.0.1/localhost (Host check blocks DNS-rebinding), POST also needs same Origin.
+const SETTINGS_FILE=()=>process.env.WEBLUME_SETTINGS_FILE||path.join(ROOT,"weblume-settings.json");
+const hostOk=req=>/^(127\.0\.0\.1|localhost)(:\d+)?$/i.test(String(req.headers.host||""));
+function readSettings(){try{const j=JSON.parse(fs.readFileSync(SETTINGS_FILE(),"utf8"));return j&&typeof j==="object"&&!Array.isArray(j)?j:{}}catch(e){return {}}}
+function cleanSettings(b){const o={};const str=(v,n)=>typeof v==="string"?v.trim().slice(0,n):undefined;
+  if(b.keys&&typeof b.keys==="object"){o.keys={};for(const k of Object.keys(b.keys).slice(0,20))if(/^[a-z]{2,20}$/.test(k)){const v=str(b.keys[k],400);if(v!==undefined)o.keys[k]=v}}
+  if(b.pm&&typeof b.pm==="object"){o.pm={};for(const k of Object.keys(b.pm).slice(0,20))if(/^[a-z]{2,20}$/.test(k)){const v=str(b.pm[k],200);if(v)o.pm[k]=v}}
+  for(const k of["smart","fb","dl"])if(typeof b[k]==="boolean")o[k]=b[k];
+  for(const k of["url","model"]){const v=str(b[k],300);if(v!==undefined)o[k]=v}
+  return o}
 const prompt=b=>typeof b.prompt==="string"&&b.prompt.trim()&&b.prompt.length<=4000?b.prompt.trim():null;
 function state(){const v=video.config();return{
   image:images.configured(),video:v.configured,videoCancel:v.configured,
@@ -62,6 +73,12 @@ const server=http.createServer(async(req,res)=>{
     if(m!=="GET"&&m!=="HEAD"){const o=req.headers.origin;if(o&&o!=="http://"+req.headers.host&&o!=="https://"+req.headers.host)return send(res,403,{error:"Origin غير مسموح."})}
     if(m==="GET"&&(p==="/"||p==="/index.html")){res.writeHead(200,{...baseHeaders,"Content-Type":"text/html; charset=utf-8"});return res.end(fs.readFileSync(path.join(ROOT,"index.html")))}
     if(m==="GET"&&p==="/api/health")return send(res,200,state());
+    if(p==="/api/settings"){
+      if(!hostOk(req))return send(res,403,{error:"Host غير مسموح."});
+      if(m==="GET")return send(res,200,readSettings());
+      if(m==="POST"){const b=await readBody(req);const o=Object.assign(readSettings(),cleanSettings(b));
+        fs.writeFileSync(SETTINGS_FILE(),JSON.stringify(o,null,1),{mode:0o600});return send(res,200,{ok:true})}
+      return send(res,405,{error:"Method غير مسموح."})}
     const lm=p.match(/^\/api\/llm\/([a-z]+)\/(models|chat\/completions)$/);if(lm)return await relayLLM(req,res,lm[1],lm[2]);
     if(m==="GET"&&p==="/api/providers/video/check"){if(!video.config().configured)return send(res,503,{error:"مزود الفيديو مش مضبوط."});return out(res,await video.check())}
     if(m==="POST"&&p==="/api/images"){

@@ -238,7 +238,7 @@ input.sw-t:checked{background:var(--acc)}input.sw-t:checked:before{transform:tra
       <div class="prov" id="pv-cerebras"><button type="button" class="pv-pick" id="p-cerebras"><span class="pv-ic">🚀</span><span class="pv-tx"><b>Cerebras</b><small>محتاج فيزا</small></span></button><div class="pv-key"><input id="k-cerebras" dir="ltr" type="password" autocomplete="off" placeholder="csk-…" aria-label="مفتاح Cerebras"><a href="https://cloud.cerebras.ai" target="_blank" rel="noopener">طلّع مفتاح</a></div><span class="pv-st" id="st-cerebras"></span></div>
       <div class="prov" id="pv-local"><button type="button" class="pv-pick" id="p-local"><span class="pv-ic">💻</span><span class="pv-tx"><b>جهازي</b><small>Ollama · من غير إنترنت</small></span></button><div class="pv-key"><span class="hint">مش محتاج مفتاح</span></div><span class="pv-st" id="st-local"></span></div>
       </div>
-      <p class="hint">المفاتيح بتتحفظ في متصفحك بس.</p>
+      <p class="hint" id="keys-hint">المفاتيح بتتحفظ في متصفحك بس.</p>
     </div>
     <div class="card">
       <div class="card-h"><div><b>التشغيل</b></div></div>
@@ -1239,7 +1239,7 @@ function importCfg(t){const st=$("#status");st.style.whiteSpace="pre-wrap";
     const keys={};KEY_PROVS.forEach(p=>{if(typeof o.keys[p]==="string")keys[p]=o.keys[p].trim().slice(0,300)});
     readCfg();cfg=Object.assign({},cfg,{keys:Object.assign({},cfg.keys,keys),pm:Object.assign({},cfg.pm,o.pm&&typeof o.pm==="object"?o.pm:{}),smart:!!o.smart,fb:o.fb!==false,dl:o.dl!==false});
     if(typeof o.url==="string"&&typeof o.model==="string"){const pv=provOf({url:o.url});if(pv){cfg.url=PROVIDERS[pv].url;cfg.model=o.model;cfg.key=pv==="local"?"":(cfg.keys[pv]||"")}}
-    fillCfg();store.set("agent_cfg_v1",cfg);setModel();PROV_ORDER.forEach(p=>{const e_=document.getElementById("st-"+p);if(e_)delete e_.dataset.t});markPreset();st.textContent="✅ الإعدادات اتنقلت. دوس «اختبر الكل».";return true}
+    fillCfg();store.set("agent_cfg_v1",cfg);saveServer();setModel();PROV_ORDER.forEach(p=>{const e_=document.getElementById("st-"+p);if(e_)delete e_.dataset.t});markPreset();st.textContent="✅ الإعدادات اتنقلت. دوس «اختبر الكل».";return true}
   catch(e){st.textContent="❌ النص ده مش إعدادات Weblume.";return false}}
 $("#s-import").onclick=()=>{const t=(prompt("الصق النص اللي نسخته من النسخة التانية:")||"").trim();if(t)importCfg(t)};
 const SERVER_URL="http://127.0.0.1:8787/";
@@ -1248,14 +1248,24 @@ if(VIA_SERVER&&location.hash.startsWith("#wlcfg=")){const t=decodeURIComponent(l
 if(!VIA_SERVER){fetch(SERVER_URL+"api/health",{mode:"no-cors",cache:"no-store"}).then(()=>{const b=document.createElement("button");b.type="button";b.id="srv-go";b.className="srv-go";b.textContent="🟢 السيرفر شغال · افتح Weblume منه (مفاتيحك هتتنقل لوحدها)";b.onclick=openOnServer;document.querySelector("main").prepend(b)}).catch(()=>{})}
 $("#s-testall").onclick=async()=>{const b=$("#s-testall");b.disabled=true;b.textContent="بيختبر…";await Promise.all(PROV_ORDER.map(testOne));b.disabled=false;b.textContent="اختبر الكل"};
 function readCfg(){const keys=Object.assign({},cfg.keys);KEY_PROVS.forEach(p=>{const el=document.getElementById("k-"+p);if(el)keys[p]=el.value.trim()});const url=$("#s-url").value.trim(),model=$("#s-model").value.trim();let key=$("#s-key").value.trim();const pv=provOf({url});if(pv&&pv!=="local"&&!key&&keys[pv])key=keys[pv];const pm=Object.assign({},cfg.pm);if(pv&&model)pm[pv]=model;cfg={url,model,key,fast:$("#s-fast").checked,dl:$("#s-dl").checked,fb:$("#s-fb").checked,smart:$("#s-smart").checked,keys,pm,mm31:1}}
-function applyProvider(p,model){readCfg();const P=PROVIDERS[p];cfg=Object.assign({},cfg,{url:P.url,model:model||cfg.pm[p]||P.model,key:p==="local"?"":(cfg.keys[p]||""),fast:p==="local"});fillCfg();store.set("agent_cfg_v1",cfg);setModel();const st=$("#status");st.style.whiteSpace="pre-wrap";
+function applyProvider(p,model){readCfg();const P=PROVIDERS[p];cfg=Object.assign({},cfg,{url:P.url,model:model||cfg.pm[p]||P.model,key:p==="local"?"":(cfg.keys[p]||""),fast:p==="local"});fillCfg();store.set("agent_cfg_v1",cfg);saveServer();setModel();const st=$("#status");st.style.whiteSpace="pre-wrap";
   st.textContent=p!=="local"&&!cfg.keys[p]?"⚠️ اتحوّل على "+P.label+"، بس لازم تحط مفتاح "+P.label+" في الخانة بتاعته.":"✅ اتحوّل على "+P.label+" ("+cfg.model+").";checkModel()}
 PROV_ORDER.forEach(p=>{const b=document.getElementById("p-"+p);if(b)b.onclick=()=>applyProvider(p)});
 KEY_PROVS.forEach(p=>{const el=document.getElementById("k-"+p);if(el)el.addEventListener("input",()=>{if(provOf({url:$("#s-url").value})===p)$("#s-key").value=el.value.trim();delete MODEL_CACHE[p];const st=document.getElementById("st-"+p);if(st)delete st.dataset.t;persist()})});
 const MODEL_CACHE={};
 fillCfg();
+if(VIA_SERVER){$("#keys-hint").textContent="🔒 المفاتيح محفوظة في ملف على جهازك (weblume-settings.json)، ومش هتضيع لو المتصفح اتمسح.";
+  fetch("/api/settings",{cache:"no-store"}).then(r=>r.ok?r.json():{}).then(o=>{if(!o||typeof o!=="object")return;let ch=false;const hadAny=KEY_PROVS.some(p=>cfg.keys[p]);
+    if(o.keys&&typeof o.keys==="object")KEY_PROVS.forEach(p=>{if(typeof o.keys[p]==="string"&&o.keys[p]&&!cfg.keys[p]){cfg.keys[p]=o.keys[p];ch=true}});
+    if(o.pm&&typeof o.pm==="object")Object.keys(o.pm).forEach(k=>{if(PROVIDERS[k]&&!cfg.pm[k]&&typeof o.pm[k]==="string"){cfg.pm[k]=o.pm[k];ch=true}});
+    if(!hadAny&&ch){if(typeof o.smart==="boolean")cfg.smart=o.smart;if(typeof o.fb==="boolean")cfg.fb=o.fb;if(typeof o.dl==="boolean")cfg.dl=o.dl;
+      if(typeof o.url==="string"&&typeof o.model==="string"){const pv=provOf({url:o.url});if(pv){cfg.url=PROVIDERS[pv].url;cfg.model=o.model}}}
+    const pv=provOf(cfg);if(pv&&pv!=="local"&&!cfg.key&&cfg.keys[pv])cfg.key=cfg.keys[pv];
+    if(ch){store.set("agent_cfg_v1",cfg);fillCfg();setModel()}
+    saveServer()}).catch(()=>{})}
 $("#s-save").onclick=()=>{persist();$("#status").textContent="✅ اتحفظ."};
-function persist(){readCfg();store.set("agent_cfg_v1",cfg);setModel();markPreset()}
+let ssT=0;function saveServer(){if(!VIA_SERVER)return;clearTimeout(ssT);ssT=setTimeout(()=>{fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({keys:cfg.keys,pm:cfg.pm,smart:!!cfg.smart,fb:cfg.fb!==false,dl:cfg.dl!==false,url:cfg.url,model:cfg.model})}).catch(()=>{})},400)}
+function persist(){readCfg();store.set("agent_cfg_v1",cfg);setModel();markPreset();saveServer()}
 ["#s-url","#s-model","#s-key"].forEach(i=>$(i).addEventListener("input",persist));
 ["#s-fast","#s-dl","#s-fb","#s-smart"].forEach(i=>$(i).addEventListener("change",persist));
 function fillModels(names){const dl=$("#mlist");dl.textContent="";names.forEach(n=>{const o=document.createElement("option");o.value=n;dl.appendChild(o)})}

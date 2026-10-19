@@ -92,7 +92,7 @@ const call=(port,method,p,body,o={})=>new Promise(res=>{const d=o.raw!==undefine
   r=await call(p,"GET","/");T("serves index.html",r.s===200&&/<html/.test(r.t));
   // frontend <-> backend contract
   const html=fs.readFileSync(path.join(__dirname,"..","index.html"),"utf8");
-  T("frontend calls only routes the backend implements",["/api/health","/api/images","/api/video/jobs"].every(x=>html.includes('"'+x))&&!/\/api\/(?!health|images|video\/jobs|items|llm\/)/.test(html.replace(/\/api\/items/g,"").replace(/https:\/\/[\w.-]+\/api\/v1/g,"")));
+  T("frontend calls only routes the backend implements",["/api/health","/api/images","/api/video/jobs"].every(x=>html.includes('"'+x))&&!/\/api\/(?!health|images|video\/jobs|items|llm\/|settings)/.test(html.replace(/\/api\/items/g,"").replace(/https:\/\/[\w.-]+\/api\/v1/g,"")));
   T("frontend polls with fields backend returns (status/url/error/id)",/j\.status==="succeeded"/.test(html)&&/j\.url/.test(html)&&/j\.error/.test(html)&&/vid=j\.id/.test(html)&&/j\.status==="canceled"/.test(html));
   // LLM relay (providers that block browser CORS), against a LOCAL MOCK upstream
   E.LLM_NVIDIA_BASE="http://127.0.0.1:"+mp+"/nv";
@@ -112,5 +112,13 @@ const call=(port,method,p,body,o={})=>new Promise(res=>{const d=o.raw!==undefine
   T("llm relay: wrong method rejected",r.s===405);
   r=await call(p,"POST","/api/llm/nvidia/chat/completions",null,{raw:"[1,2]",h:{Authorization:"Bearer nvapi-MOCKKEY123"}});
   T("llm relay: non-object JSON rejected",r.s===400);
+  // local settings file
+  const SF=require("path").join(require("os").tmpdir(),"wl-settings-test-"+process.pid+".json");E.WEBLUME_SETTINGS_FILE=SF;try{fs.unlinkSync(SF)}catch(e){}
+  r=await call(p,"GET","/api/settings",null,{h:{Host:"127.0.0.1:"+p}});T("settings: empty when no file",r.s===200&&r.j&&Object.keys(r.j).length===0);
+  r=await call(p,"POST","/api/settings",{keys:{groq:"gsk_x1234567",evil$:"no"},pm:{groq:"m"},smart:true,junk:"drop"},{h:{Host:"127.0.0.1:"+p}});
+  r=await call(p,"GET","/api/settings",null,{h:{Host:"localhost:"+p}});T("settings: saved, cleaned, readable",r.s===200&&r.j.keys.groq==="gsk_x1234567"&&!("evil$" in r.j.keys)&&r.j.smart===true&&!("junk" in r.j));
+  r=await call(p,"GET","/api/settings",null,{h:{Host:"attacker.example:"+p}});T("settings: foreign Host rejected (DNS rebinding)",r.s===403);
+  r=await call(p,"POST","/api/settings",{keys:{groq:"x"}},{h:{Host:"127.0.0.1:"+p,Origin:"https://evil.example"}});T("settings: foreign Origin cannot write",r.s===403);
+  try{fs.unlinkSync(SF)}catch(e){}
   console.log("RESULT pass="+pass+" fail="+fail);server.close();mock.close();process.exit(fail?1:0);
 })();
