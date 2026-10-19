@@ -1287,8 +1287,8 @@ function detectServer(manual){if(VIA_SERVER||location.protocol==="file:")return;
 detectServer(false);
 /* ---- Account sync (Supabase). Keys are encrypted in the browser (AES-GCM, key from the password via PBKDF2);
    the database only ever stores ciphertext. Supabase URL + anon key are public by design. ---- */
-const SUPA_DEFAULT={url:"",anon:""};
-let supa=Object.assign({},SUPA_DEFAULT,store.get("wl_supa_v1",{}));
+const SUPA_DEFAULT={url:"https://vqnbbxihcgftvuvulclq.supabase.co",anon:"sb_publishable_Gmxl9WZDN2_s7wfSmuVzGw_Brcl02uo"};
+let supa=(()=>{const st_=store.get("wl_supa_v1",{})||{};return {url:st_.url||SUPA_DEFAULT.url,anon:st_.anon||SUPA_DEFAULT.anon}})();
 let sess=store.get("wl_sess_v1",null),encKey=null,cpT=0;
 const B64={enc:b=>{let s_="";new Uint8Array(b).forEach(x=>s_+=String.fromCharCode(x));return btoa(s_)},dec:t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0))};
 const supaReady=()=>/^https:\/\/[\w.-]+$/.test(String(supa.url||"").replace(/\/+$/,""))&&String(supa.anon||"").length>20;
