@@ -53,6 +53,17 @@ const cfg={url:"http://x/v1",model:"m"};
   const sh=[{role:"user",content:"اعملي موقع كافيه"}],evs=[];await c.runAgent(cfg,[],sh,ev=>evs.push(ev),new AbortController().signal);
   const se=evs.find(x=>x.type==="site"),st=sh.find(x=>x.role==="tool");
   T("agent loop: build_site renders site event + compact tool result",se&&/Sahr/.test(se.html)&&st&&/SITE_DATA:/.test(st.content)&&st.content.length<se.html.length&&sh[sh.length-1].content==="جاهز");
+  // free design mode: no build_site tool, design direction injected, truncated HTML continued
+  {let bodies=[],evs=[];const rep=["```html\n<!doctype html><html><body>AAA","BBB</body></html>\n```"];c=mk(async(u,o)=>{bodies.push(JSON.parse(o.body));return sse(['data: '+JSON.stringify({choices:[{delta:{content:rep[bodies.length-1]||"x"}}]})+'\n'])});
+  const fh=[{role:"user",content:"اعمل موقع لكافيه في المعادي"}];await c.runAgent(cfg,[],fh,e=>evs.push(e),new AbortController().signal);
+  const sy=bodies[0].messages[0].content,names=(bodies[0].tools||[]).map(t=>t.function.name),de=evs.find(e=>e.type==="design");
+  T("free design: no build_site tool, art-direction + direction injected",!names.includes("build_site")&&/ART DIRECTION/.test(sy)&&/MOTION SYSTEM/.test(sy)&&de&&sy.includes(de.dir.n)&&/cafe/.test(de.dir.tags)&&!/نادِ أداة build_site فورًا/.test(sy));
+  T("free design: truncated HTML auto-continued into one file",bodies.length===2&&/AAABBB<\/body><\/html>/.test(fh[fh.length-1].content)&&evs.some(e=>e.type==="cont"));
+  bodies=[];c=mk(async(u,o)=>{bodies.push(JSON.parse(o.body));return sse(['data: {"choices":[{"delta":{"content":"ok"}}]}\n'])});
+  await c.runAgent(Object.assign({},cfg,{tpl:true}),[],[{role:"user",content:"اعمل موقع لكافيه"}],()=>{},new AbortController().signal);
+  T("template mode still uses build_site",(bodies[0].tools||[]).some(t=>t.function.name==="build_site")&&/build_site فورًا/.test(bodies[0].messages[0].content));
+  vm.runInContext("this.pickDirection=pickDirection;this.DESIGN_DIRS=DESIGN_DIRS",c);const all=c.DESIGN_DIRS.filter(d=>/clinic/.test(d.tags)).map(d=>d.n);const seen=new Set();for(let k=0;k<40;k++)seen.add(c.pickDirection("موقع لعيادة اسنان",all.slice(1).join(" ")).n);
+  T("design direction fits the business and avoids used ones",seen.size===1&&seen.has(all[0]));}
   // ZIP integrity (needs python3 or unzip; otherwise reported as skipped, not passed)
   const zc={TextEncoder,Blob,Uint8Array,DataView,ArrayBuffer};vm.createContext(zc);vm.runInContext(zipSrc+";this.makeZip=makeZip;",zc);
   const files=[{name:"app.py",code:"print('مرحبا')\n"},{name:"templates/index.html",code:"<h1>أهلاً</h1>".repeat(500)},{name:"static/style.css",code:""}];

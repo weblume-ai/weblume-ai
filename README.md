@@ -19,6 +19,9 @@ weblume/
     └── frontend.test.js            Frontend logic tests (VM, mocked fetch)
 ```
 
+## Free design mode (default)
+Site requests are designed from scratch instead of filling the template. Each request gets an art-direction seed (16 directions, matched to the business type and never repeated in the same chat), and the model writes one complete HTML file guided by six built-in skills: design-director, layout-patterns, motion-kit, site-functionality, site-quality-gate, site-copywriting. Truncated HTML is continued automatically. Turn off "🎨 تصميم حر" in Settings, or say "قالب" in the request, to use the `build_site` template instead.
+
 ## Premium site builder (`build_site` tool)
 For shop/cafe/restaurant/business sites the model does not write HTML. It calls the `build_site` tool with data only (name, headline, menu or services, WhatsApp, address, hours, theme), and `renderSite()` in `index.html` turns it into a complete Weblume-quality page: dark themed hero, menu with search, category chips and a WhatsApp order cart, services list, steps, visit/map, WhatsApp contact form, floating WhatsApp button, RTL/LTR, mobile layout. Themes: gold, ember, weblume, rose, emerald, cream. All text is escaped and only https image links are kept. This keeps quality high and output fast even with small/free models. If a model replies with the JSON as text instead of a tool call, the app still renders it.
 
