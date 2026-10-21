@@ -16,9 +16,15 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+set "DL=%USERPROFILE%\Downloads"
+if not exist "weblume-lora.gguf" if exist "%DL%\weblume-lora.gguf" copy /y "%DL%\weblume-lora.gguf" . >nul
+if not exist "Modelfile" if exist "Modelfile.txt" ren "Modelfile.txt" "Modelfile"
+if not exist "Modelfile" if exist "%DL%\Modelfile" copy /y "%DL%\Modelfile" "Modelfile" >nul
+if not exist "Modelfile" if exist "%DL%\Modelfile.txt" copy /y "%DL%\Modelfile.txt" "Modelfile" >nul
 if not exist "weblume-lora.gguf" (
   echo  [X] weblume-lora.gguf not found.
-  echo      Download it from Google Drive - folder weblume_model - into:
+  echo      Download it from Google Drive - My Drive - weblume_model
+  echo      (put it in Downloads or in this folder):
   echo      %~dp0
   pause
   exit /b 1
