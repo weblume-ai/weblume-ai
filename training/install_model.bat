@@ -16,7 +16,7 @@ if not exist "weblume-lora.gguf" if exist "%DL%\weblume-lora.gguf" copy /y "%DL%
 if not exist "weblume.gguf" if not exist "weblume-lora.gguf" goto NO_LORA
 if not exist "Modelfile.merged" goto NO_MODELFILE
 
-echo  [1/6] Allowing Weblume AI to talk to Ollama...
+echo  [1/5] Allowing Weblume AI to talk to Ollama...
 setx OLLAMA_ORIGINS "*" >nul
 setx OLLAMA_CONTEXT_LENGTH "16384" >nul
 set "OLLAMA_ORIGINS=*"
@@ -29,7 +29,7 @@ timeout /t 5 >nul
 
 if exist "weblume.gguf" goto CREATE
 
-echo  [2/6] Making sure the base model qwen2.5-coder:7b is downloaded...
+echo  [2/5] Making sure the base model qwen2.5-coder:7b is downloaded...
 ollama pull qwen2.5-coder:7b
 if errorlevel 1 goto PULL_FAIL
 
@@ -40,34 +40,26 @@ if not defined BASEFILE goto NO_BASE
 if not exist "%BASEFILE%" goto NO_BASE
 echo        base: %BASEFILE%
 
-if exist "llama\llama-export-lora.exe" goto HAVE_TOOLS
-echo  [3/6] Downloading the free llama.cpp tools - about 30 MB...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $rs = Invoke-RestMethod 'https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=5'; $a = $rs | ForEach-Object { $_.assets } | Where-Object { $_.name -like '*bin-win-cpu-x64.zip' } | Select-Object -First 1; Invoke-WebRequest $a.browser_download_url -OutFile 'llama.zip'"
-if errorlevel 1 goto TOOLS_FAIL
-if not exist "llama" mkdir llama
-tar -xf llama.zip -C llama
-del llama.zip
-:HAVE_TOOLS
-set "EXPORT="
-set "QUANT="
-for /f "delims=" %%F in ('dir /s /b "llama\llama-export-lora.exe" 2^>nul') do set "EXPORT=%%F"
-for /f "delims=" %%F in ('dir /s /b "llama\llama-quantize.exe" 2^>nul') do set "QUANT=%%F"
+set "EXPORT=%~dp0tools\llama-export-lora.exe"
+set "QUANT=%~dp0tools\llama-quantize.exe"
+if not exist "%EXPORT%" set "EXPORT="
+if not exist "%QUANT%" set "QUANT="
 if not defined EXPORT goto TOOLS_FAIL
 if not defined QUANT goto TOOLS_FAIL
 
-echo  [4/6] Merging your training into the model - a few minutes, needs ~16 GB free disk...
+echo  [3/5] Merging your training into the model - a few minutes, needs ~16 GB free disk...
 "%EXPORT%" -m "%BASEFILE%" --lora weblume-lora.gguf -o weblume-f16.gguf -t 8
 if errorlevel 1 goto MERGE_FAIL
 if not exist "weblume-f16.gguf" goto MERGE_FAIL
 
-echo  [5/6] Shrinking it back to ~4.7 GB - a few minutes...
+echo  [4/5] Shrinking it back to ~4.7 GB - a few minutes...
 "%QUANT%" --allow-requantize weblume-f16.gguf weblume.gguf Q4_K_M 8
 if errorlevel 1 goto MERGE_FAIL
 if not exist "weblume.gguf" goto MERGE_FAIL
 del weblume-f16.gguf
 
 :CREATE
-echo  [6/6] Creating the model weblume in Ollama...
+echo  [5/5] Creating the model weblume in Ollama...
 ollama create weblume -f Modelfile.merged
 if errorlevel 1 goto CREATE_FAIL
 
@@ -101,7 +93,7 @@ echo  [X] Could not find the downloaded qwen2.5-coder:7b file. Take a screenshot
 pause
 exit /b 1
 :TOOLS_FAIL
-echo  [X] Could not get the llama.cpp tools. Take a screenshot and send it.
+echo  [X] The tools folder is missing. Extract the whole zip, then run this file again.
 pause
 exit /b 1
 :MERGE_FAIL
