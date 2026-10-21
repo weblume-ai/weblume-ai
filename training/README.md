@@ -5,7 +5,7 @@
 |---|---|
 | `Weblume_Coder_Train.ipynb` | التدريب على Google Colab ببلاش. بيانات التدريب جاهزة جوّاه، ومش محتاج أي مفتاح |
 | `install_model.bat` | يسطّب الموديل على جهازك بدبل كليك |
-| `Modelfile` | إعدادات الموديل لـ Ollama (النوت بوك بيعمل نسخة منه في Drive برضو) |
+| `Modelfile` | بيتعمل في Drive مع `weblume-lora.gguf` بعد التدريب |
 
 ## اتدرّب على إيه؟
 - **١٤٠ موقع كامل** بأسلوب Weblume لـ٢٤ نوع نشاط، بـ١٢ ستايل ألوان و٤ أشكال هيرو و١٥ خط.
@@ -26,13 +26,13 @@
 6. هيطلب إذن **Google Drive** ← دوس **Connect to Google Drive** واختار حسابك ← **Allow**.
 7. سيبه شغال وخلّي التاب مفتوح. هتشوف رقم الـ`loss` بيقل، وده معناه إنه بيتعلم.
 8. لو فصل في النص: افتحه تاني، واعمل **Runtime ← Run all**، وهو هيكمّل من آخر نقطة.
-9. لما يخلص هتلاقي في **Google Drive** فولدر **weblume_model** فيه `model.gguf` (حوالي ٤.٧ جيجا) و`Modelfile`.
+9. لما يخلص هتلاقي في **Google Drive** فولدر **weblume_model** فيه `weblume-lora.gguf` (حوالي ٨٠ ميجا) و`Modelfile`.
 
 ### ثانيًا: على جهازك
 1. سطّب **Ollama** ببلاش من **https://ollama.com/download** (Windows).
-2. نزّل `model.gguf` و`Modelfile` من فولدر **weblume_model** في Google Drive.
+2. نزّل `weblume-lora.gguf` و`Modelfile` من فولدر **weblume_model** في Google Drive.
 3. حطهم في نفس الفولدر مع `install_model.bat`، واستبدل `Modelfile` القديم لو سألك.
-4. دوس **دبل كليك** على `install_model.bat`.
+4. دوس **دبل كليك** على `install_model.bat`. أول مرة هينزّل `qwen2.5-coder:7b` الرسمي (حوالي ٤.٧ جيجا) وبعدين يركّب عليه تدريبك.
 5. لما يكتب «Done» جرّبه في نفس الشاشة: اكتب `اعملي موقع لكافيه اسمه X`، ولما تخلص اكتب `/bye`.
 
 ### ثالثًا: في Weblume AI
