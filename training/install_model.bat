@@ -13,34 +13,67 @@ if errorlevel 1 goto NO_OLLAMA
 
 set "DL=%USERPROFILE%\Downloads"
 if not exist "weblume-lora.gguf" if exist "%DL%\weblume-lora.gguf" copy /y "%DL%\weblume-lora.gguf" . >nul
-if not exist "Modelfile" if exist "Modelfile.txt" ren "Modelfile.txt" "Modelfile"
-if not exist "Modelfile" if exist "%DL%\Modelfile" copy /y "%DL%\Modelfile" "Modelfile" >nul
-if not exist "Modelfile" if exist "%DL%\Modelfile.txt" copy /y "%DL%\Modelfile.txt" "Modelfile" >nul
-if not exist "weblume-lora.gguf" goto NO_LORA
-if not exist "Modelfile" goto NO_MODELFILE
+if not exist "weblume.gguf" if not exist "weblume-lora.gguf" goto NO_LORA
+if not exist "Modelfile.merged" goto NO_MODELFILE
 
-echo  [1/4] Allowing Weblume AI to talk to Ollama...
+echo  [1/6] Allowing Weblume AI to talk to Ollama...
 setx OLLAMA_ORIGINS "*" >nul
 setx OLLAMA_CONTEXT_LENGTH "16384" >nul
 set "OLLAMA_ORIGINS=*"
 set "OLLAMA_CONTEXT_LENGTH=16384"
-taskkill /f /im "ollama app.exe" >nul 2>nul
-taskkill /f /im "ollama.exe" >nul 2>nul
-timeout /t 2 >nul
+ollama list >nul 2>nul
+if not errorlevel 1 goto SERVER_OK
 start "" /min ollama serve
 timeout /t 5 >nul
+:SERVER_OK
 
-echo  [2/4] Downloading the base model qwen2.5-coder:7b - first time only, about 4.7 GB...
+if exist "weblume.gguf" goto CREATE
+
+echo  [2/6] Making sure the base model qwen2.5-coder:7b is downloaded...
 ollama pull qwen2.5-coder:7b
 if errorlevel 1 goto PULL_FAIL
 
-echo  [3/4] Creating the model weblume...
-ollama create weblume -f Modelfile
+set "BASEFILE="
+for %%F in ("%USERPROFILE%\.ollama\models\blobs\sha256-60e05f210007*") do set "BASEFILE=%%~fF"
+if not defined BASEFILE for /f "tokens=1,*" %%A in ('ollama show qwen2.5-coder:7b --modelfile ^| findstr /b "FROM"') do set "BASEFILE=%%B"
+if not defined BASEFILE goto NO_BASE
+if not exist "%BASEFILE%" goto NO_BASE
+echo        base: %BASEFILE%
+
+if exist "llama\llama-export-lora.exe" goto HAVE_TOOLS
+echo  [3/6] Downloading the free llama.cpp tools - about 30 MB...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $rs = Invoke-RestMethod 'https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=5'; $a = $rs | ForEach-Object { $_.assets } | Where-Object { $_.name -like '*bin-win-cpu-x64.zip' } | Select-Object -First 1; Invoke-WebRequest $a.browser_download_url -OutFile 'llama.zip'"
+if errorlevel 1 goto TOOLS_FAIL
+if not exist "llama" mkdir llama
+tar -xf llama.zip -C llama
+del llama.zip
+:HAVE_TOOLS
+set "EXPORT="
+set "QUANT="
+for /f "delims=" %%F in ('dir /s /b "llama\llama-export-lora.exe" 2^>nul') do set "EXPORT=%%F"
+for /f "delims=" %%F in ('dir /s /b "llama\llama-quantize.exe" 2^>nul') do set "QUANT=%%F"
+if not defined EXPORT goto TOOLS_FAIL
+if not defined QUANT goto TOOLS_FAIL
+
+echo  [4/6] Merging your training into the model - a few minutes, needs ~16 GB free disk...
+"%EXPORT%" -m "%BASEFILE%" --lora weblume-lora.gguf -o weblume-f16.gguf -t 8
+if errorlevel 1 goto MERGE_FAIL
+if not exist "weblume-f16.gguf" goto MERGE_FAIL
+
+echo  [5/6] Shrinking it back to ~4.7 GB - a few minutes...
+"%QUANT%" --allow-requantize weblume-f16.gguf weblume.gguf Q4_K_M 8
+if errorlevel 1 goto MERGE_FAIL
+if not exist "weblume.gguf" goto MERGE_FAIL
+del weblume-f16.gguf
+
+:CREATE
+echo  [6/6] Creating the model weblume in Ollama...
+ollama create weblume -f Modelfile.merged
 if errorlevel 1 goto CREATE_FAIL
 
 echo.
-echo  [4/4] Done!  In Weblume AI: Settings - My device - choose model: weblume
-echo        Chat with it here now, type /bye to exit:
+echo  Done!  In Weblume AI: Settings - My device - choose model: weblume
+echo  Chat with it here now, type /bye to exit:
 echo.
 ollama run weblume
 pause
@@ -48,28 +81,33 @@ exit /b 0
 
 :NO_OLLAMA
 echo  [X] Ollama is not installed. Opening the download page...
-echo      Install it, then run this file again.
 start "" https://ollama.com/download/windows
 pause
 exit /b 1
-
 :NO_LORA
-echo  [X] weblume-lora.gguf not found.
-echo      Put it in this folder or in Downloads:
-echo      %~dp0
+echo  [X] weblume-lora.gguf not found. Put it in this folder or in Downloads.
 pause
 exit /b 1
-
 :NO_MODELFILE
-echo  [X] Modelfile not found. Put it in this folder or in Downloads.
+echo  [X] Modelfile.merged not found in this folder.
 pause
 exit /b 1
-
 :PULL_FAIL
 echo  [X] Download failed. Check your internet and run this file again.
 pause
 exit /b 1
-
+:NO_BASE
+echo  [X] Could not find the downloaded qwen2.5-coder:7b file. Take a screenshot and send it.
+pause
+exit /b 1
+:TOOLS_FAIL
+echo  [X] Could not get the llama.cpp tools. Take a screenshot and send it.
+pause
+exit /b 1
+:MERGE_FAIL
+echo  [X] Merging failed. Take a screenshot of this window and send it.
+pause
+exit /b 1
 :CREATE_FAIL
 echo  [X] Something went wrong. Take a screenshot of this window and send it.
 pause
