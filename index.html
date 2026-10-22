@@ -427,15 +427,22 @@ async function runWeblume(cfg,skills,history,onEvent,signal){
   if(plan.mode==="edit"&&!prev)plan.mode="build";
   const WL_INTER=/(لعب|game|تدريب|تمرين|\baim\b|ايم|إيم|trainer|أداة|اداة|tool|حاسب|calculator|داشبورد|dashboard|لوحة تحكم|تطبيق|\bapp\b|كويز|quiz|امتحان|اختبار|محاكي|simulat|تفاعلي|interactive|سلة|cart|chat|شات|بوت|bot|خريطة تفاعلية|canvas|three\.?js)/i;
   if(plan.mode!=="chat"&&WL_INTER.test(ut+" "+String(plan.brief||""))){plan.who="cloud";if(!hp)hp=WL_HELPERS.find(usable)||""}
-  if(plan.mode!=="chat"&&hp&&(plan.who==="cloud"||(plan.mode==="edit"&&prev.length>30000))){const P=PROVIDERS[hp];onEvent({type:"step",phase:"بيكتب الكود",text:"☁️ الطلب ده "+(plan.who==="cloud"?"تفاعلي ومحتاج موديل أكبر":"تعديل على ملف كبير")+"، فـ "+P.label+" هيعمله بنفسه"});
-    try{return await runAgent(Object.assign({},cfg,{url:P.url,model:cfg.pm[hp]||P.model,key:cfg.keys[hp],fast:false}),skills,history,onEvent,signal)}
-    catch(e){if(String(e.message).startsWith("⏹"))throw e;onEvent({type:"step",text:"⚠️ "+P.label+" وقف: "+String(e.message).slice(0,120)+"، weblume هيحاول"})}}
+  const cloudRun=async why=>{const order=[hp,...WL_HELPERS.filter(p=>p!==hp)].filter((p,k,a)=>p&&usable(p)&&a.indexOf(p)===k);
+    for(const p of order){const P=PROVIDERS[p],n=history.length;onEvent({type:"step",phase:"بيكتب الكود",text:"☁️ "+why+"، فـ "+P.label+" هيعمله"});
+      try{await runAgent(Object.assign({},cfg,{url:P.url,model:cfg.pm[p]||P.model,key:cfg.keys[p],fast:false}),skills,history,onEvent,signal);return true}
+      catch(e){if(String(e.message).startsWith("⏹"))throw e;history.length=n;onEvent({type:"step",text:"⚠️ "+P.label+" وقف: "+String(e.message).slice(0,140)})}}
+    return false};
+  if(plan.mode!=="chat"&&(plan.who==="cloud"||(plan.mode==="edit"&&prev.length>30000))){
+    if(await cloudRun(plan.who==="cloud"?"الطلب ده تفاعلي ومحتاج موديل أكبر":"تعديل على ملف كبير"))return;
+    throw new Error("الطلب ده محتاج موديل سحابي (Gemini أو Mistral)، ومفيش مصدر منهم ردّ دلوقتي. راجع المفاتيح في الإعدادات أو النت وجرّب تاني.")}
   if(plan.mode==="chat"){const msg={role:"assistant",content:String(plan.reply)};history.push(msg);onEvent({type:"text",text:msg.content});return}
   onEvent({type:"step",phase:"بيكتب الكود",text:"💻 weblume بيكتب "+(plan.mode==="edit"?"التعديل":"الموقع")+": "+String(plan.brief).slice(0,300)});
   const user=plan.mode==="edit"?String(plan.brief)+"\n\n```html\n"+prev+"\n```":String(plan.brief);
   const msg=await chatOnce(cfg,[{role:"system",content:WL_SYS},{role:"user",content:user}],onEvent,signal,true);
   if(!msg.content){onEvent({type:"empty"});return}
   if(/<!doctype|<html/i.test(msg.content)&&!/<\/html>/i.test(msg.content)){onEvent({type:"cont"});const pre=String(msg.content).replace(/\n?```\s*$/,"");const more=await chatOnce(cfg,[{role:"system",content:WL_SYS},{role:"user",content:user},{role:"assistant",content:pre},{role:"user",content:"كمّل من آخر حرف وقفت عنده بالظبط لحد </html> من غير ما تعيد حاجة."}],ev=>ev.type==="live"?onEvent({type:"live",text:pre+ev.text}):onEvent(ev),signal,true);msg.content=pre+String(more.content||"").replace(/^\s*```(html)?\s*\n?/i,"")}
+  const nb=(String(msg.content).match(/```html/gi)||[]).length;
+  if(!(/<!doctype|<html[\s>]/i.test(msg.content)&&/<\/html>/i.test(msg.content)&&nb<=1)&&plan.mode!=="chat"){onEvent({type:"step",text:"⚠️ weblume مطلّعش ملف كامل سليم"});if(await cloudRun("هخلّي موديل أكبر يعمله"))return}
   history.push({role:"assistant",content:msg.content});onEvent({type:"text",text:msg.content});
 }
 async function runAgent(cfg,skills,history,onEvent,signal){
