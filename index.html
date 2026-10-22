@@ -425,6 +425,8 @@ async function runWeblume(cfg,skills,history,onEvent,signal){
     catch(e){if(String(e.message).startsWith("⏹"))throw e;onEvent({type:"step",text:"⚠️ "+P.label+" مقدرش يساعد: "+String(e.message).slice(0,120)})}}
   if(!plan)plan={mode:prev&&!/(اعمل|عايز|ابني).{0,12}(موقع|صفح)/.test(ut)?"edit":"build",brief:ut,reply:""};
   if(plan.mode==="edit"&&!prev)plan.mode="build";
+  const WL_INTER=/(لعب|game|تدريب|تمرين|\baim\b|ايم|إيم|trainer|أداة|اداة|tool|حاسب|calculator|داشبورد|dashboard|لوحة تحكم|تطبيق|\bapp\b|كويز|quiz|امتحان|اختبار|محاكي|simulat|تفاعلي|interactive|سلة|cart|chat|شات|بوت|bot|خريطة تفاعلية|canvas|three\.?js)/i;
+  if(plan.mode!=="chat"&&WL_INTER.test(ut+" "+String(plan.brief||""))){plan.who="cloud";if(!hp)hp=WL_HELPERS.find(usable)||""}
   if(plan.mode!=="chat"&&hp&&(plan.who==="cloud"||(plan.mode==="edit"&&prev.length>30000))){const P=PROVIDERS[hp];onEvent({type:"step",phase:"بيكتب الكود",text:"☁️ الطلب ده "+(plan.who==="cloud"?"تفاعلي ومحتاج موديل أكبر":"تعديل على ملف كبير")+"، فـ "+P.label+" هيعمله بنفسه"});
     try{return await runAgent(Object.assign({},cfg,{url:P.url,model:cfg.pm[hp]||P.model,key:cfg.keys[hp],fast:false}),skills,history,onEvent,signal)}
     catch(e){if(String(e.message).startsWith("⏹"))throw e;onEvent({type:"step",text:"⚠️ "+P.label+" وقف: "+String(e.message).slice(0,120)+"، weblume هيحاول"})}}
